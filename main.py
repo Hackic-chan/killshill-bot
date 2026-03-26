@@ -15,19 +15,19 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
 # 2. CONFIGURATION
-BANNED_WORDS = ["fuck", "shit", "scam", "nigger", "retard", "slut", "Nigga", "ass", "Motherfucker", "MF"] # Add more here
+BANNED_WORDS = ["fuck", "shit", "scam", "nigger", "retard", "slut", "nigga", "ass", "motherfucker", "mf"] # Lowercase for matching
 FAQ_DATA = {
     "website?": "🌐 <b>Our Website:</b> https://killshill.ai/",
     "x?": "🐦 <b>Follow us on X:</b> https://x.com/killshillAI",
     "instagram?": "📸 <b>Instagram:</b> https://www.instagram.com/killshillai/",
     "linkedin?": "💼 <b>LinkedIn:</b> https://www.linkedin.com/company/killshillai",
-    "social?": "🔗 <b>Official Socials:</b>\n- X: https://x.com/killshillAI\n- IG: https://www.instagram.com/killshillai\n- dashboard: https://killshill.ai/"
+    "social?": "🔗 <b>Official Socials:</b>\n- X: https://x.com/killshillAI\n- IG: https://www.instagram.com/killshillai\n- Dashboard: https://killshill.ai/"
 }
 
-# Tracking for Flood Control { user_id: [timestamps] }
+# Tracking for Flood Control & Clean Chat { user_id: [timestamps] }
 msg_history = {}
 sticker_history = {}
-last_welcome = {} # Added: Tracks the last welcome message so we can keep the chat clean
+last_welcome = {} # Tracks the last welcome message so we can keep the chat clean
 
 # 3. HELPERS
 def is_admin(chat_id, user_id):
@@ -47,17 +47,24 @@ def delayed_delete(chat_id, message_id, delay):
         safe_delete(chat_id, message_id)
     threading.Thread(target=_delete, daemon=True).start()
 
-# 4. PILLAR 1: JOIN & VERIFY
+# 4. PILLAR 1: JOIN/LEAVE & VERIFY
+@bot.message_handler(content_types=["left_chat_member"])
+def on_user_leave(message):
+    safe_delete(message.chat.id, message.message_id) # Instantly removes "X left the group"
+
 @bot.message_handler(content_types=["new_chat_members"])
 def on_user_join(message):
     chat_id = message.chat.id
-    safe_delete(chat_id, message.message_id) # Remove "X joined" notification
+    safe_delete(chat_id, message.message_id) # Remove "X joined the group" notification
 
     for user in message.new_chat_members:
         if user.is_bot: continue
         
         # Mute user immediately
-        bot.restrict_chat_member(chat_id, user.id, can_send_messages=False)
+        try:
+            bot.restrict_chat_member(chat_id, user.id, can_send_messages=False)
+        except Exception as e:
+            log.warning(f"Could not mute user: {e}")
 
         # Welcome + Verify Button
         markup = types.InlineKeyboardMarkup()
@@ -82,10 +89,13 @@ def handle_verification(call):
         return
 
     # Unmute user
-    bot.restrict_chat_member(chat_id, user_id, can_send_messages=True, can_send_media_messages=True, 
-                             can_send_other_messages=True, can_add_web_page_previews=True)
+    try:
+        bot.restrict_chat_member(chat_id, user_id, can_send_messages=True, can_send_media_messages=True, 
+                                 can_send_other_messages=True, can_add_web_page_previews=True)
+    except Exception as e:
+        log.warning(f"Could not unmute user: {e}")
     
-    # Delete the welcome/verify message
+    # Delete the captcha verify message
     safe_delete(chat_id, call.message.message_id)
 
     # --- Clean Chat Logic: Delete previous welcome message ---
@@ -141,13 +151,14 @@ def monitor_chat(message):
 
     # --- BANNED WORDS CHECK ---
     if message.text:
-        if any(word in message.text.lower() for word in BANNED_WORDS):
+        msg_lower = message.text.lower()
+        if any(word in msg_lower for word in BANNED_WORDS):
             safe_delete(chat_id, message.message_id)
             return
 
         # --- FAQ KEYWORDS ---
         for key, response in FAQ_DATA.items():
-            if key in message.text.lower():
+            if key in msg_lower:
                 bot.reply_to(message, response)
                 return
 
@@ -172,16 +183,19 @@ def monitor_chat(message):
         if len(user_msgs) > 5:
             safe_delete(chat_id, message.message_id)
             # Mute for 5 minutes
-            bot.restrict_chat_member(chat_id, user_id, can_send_messages=False, until_date=int(now + 300))
-            bot.send_message(chat_id, f"🔇 {message.from_user.first_name} muted for 5m due to flooding.")
+            try:
+                bot.restrict_chat_member(chat_id, user_id, can_send_messages=False, until_date=int(now + 300))
+                bot.send_message(chat_id, f"🔇 <b>{message.from_user.first_name}</b> muted for 5m due to flooding.")
+            except Exception as e:
+                pass
             return
 
-# 6. KEEP ALIVE (FOR RENDER/REPLIT)
+# 6. KEEP ALIVE (FOR RENDER / REPLIT)
 app = Flask(__name__)
 @app.route('/')
 def home(): return "KillShill Ultimate is Online!", 200
 
 if __name__ == "__main__":
-    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000))), daemon=True).start()
+    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 3000))), daemon=True).start()
     log.info("🚀 KillShill Ultimate Live...")
     bot.infinity_polling(none_stop=True)
