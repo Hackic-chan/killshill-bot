@@ -27,6 +27,7 @@ FAQ_DATA = {
 # Tracking for Flood Control { user_id: [timestamps] }
 msg_history = {}
 sticker_history = {}
+last_welcome = {} # Added: Tracks the last welcome message so we can keep the chat clean
 
 # 3. HELPERS
 def is_admin(chat_id, user_id):
@@ -87,16 +88,47 @@ def handle_verification(call):
     # Delete the welcome/verify message
     safe_delete(chat_id, call.message.message_id)
 
-    # Success Message
-    success_text = (
-        f"✅ Thank you for verifying, <b>{call.from_user.first_name}</b>!\n\n"
-        "⚠️ <b>REMINDER:</b> Admins will <u>NEVER</u> DM you first. "
-        "Stay safe and check the pinned messages for rules."
-    )
-    msg = bot.send_message(chat_id, success_text)
+    # --- Clean Chat Logic: Delete previous welcome message ---
+    global last_welcome
+    if chat_id in last_welcome:
+        safe_delete(chat_id, last_welcome[chat_id])
+
+    # --- NEW ULTIMATE WELCOME SYSTEM ---
+    markup = types.InlineKeyboardMarkup()
+    btn_dash = types.InlineKeyboardButton("🌐 KillShill Dashboard", url="https://killshill.ai/")
+    btn_submit = types.InlineKeyboardButton("🎯 Submit Influencer", url="https://killshill.ai/") 
+    btn_x = types.InlineKeyboardButton("✖️ X (Twitter)", url="https://x.com/killshillAI")
+    btn_ig = types.InlineKeyboardButton("📸 Instagram", url="https://www.instagram.com/killshillai")
+    btn_in = types.InlineKeyboardButton("💼 LinkedIn", url="https://www.linkedin.com/company/killshillai")
     
-    # Self-destruct success message after 2 minutes
-    delayed_delete(chat_id, msg.message_id, 120)
+    markup.row(btn_dash, btn_submit)
+    markup.row(btn_x, btn_ig, btn_in)
+
+    first_name = call.from_user.first_name
+    welcome_text = (
+        f"Welcome to the community, <b>{first_name}</b>! 🛡️\n\n"
+        f"Tired of influencers deleting bad calls and hiding losses? So are we.\n\n"
+        f"<b>KillShill</b> is the ultimate AI Truth Engine. We bring radical transparency to Stocks, Crypto, Forex, and Options.\n\n"
+        f"<b>What we do:</b>\n"
+        f"✅ Live track Win Rates, ROI, & Risk/Reward\n"
+        f"✅ AI detection of deleted/edited posts\n"
+        f"✅ Unbiased, data-backed Leaderboards\n\n"
+        f"<i>(Note: We are an independent auditing platform, not a trading group or crypto project.)</i>\n\n"
+        f"⚠️ <b>WARNING:</b> Zero tolerance for shilling. If you drop promo links, the KillShill bot will permanently kick you.\n\n"
+        f"👇 <b>Explore the Truth Engine:</b>"
+    )
+
+    try:
+        msg = bot.send_message(
+            chat_id, 
+            welcome_text, 
+            reply_markup=markup, 
+            disable_web_page_preview=True
+        )
+        # Save ID to delete next time someone joins
+        last_welcome[chat_id] = msg.message_id
+    except Exception as e:
+        log.error(f"Failed to send welcome: {e}")
 
 # 5. PILLAR 2 & 3: FLOOD, BANNED WORDS, FAQ, STICKERS
 @bot.message_handler(func=lambda m: True, content_types=['text', 'sticker'])
@@ -144,7 +176,7 @@ def monitor_chat(message):
             bot.send_message(chat_id, f"🔇 {message.from_user.first_name} muted for 5m due to flooding.")
             return
 
-# 6. KEEP ALIVE (FOR RENDER)
+# 6. KEEP ALIVE (FOR RENDER/REPLIT)
 app = Flask(__name__)
 @app.route('/')
 def home(): return "KillShill Ultimate is Online!", 200
@@ -152,4 +184,4 @@ def home(): return "KillShill Ultimate is Online!", 200
 if __name__ == "__main__":
     threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000))), daemon=True).start()
     log.info("🚀 KillShill Ultimate Live...")
-    bot.infinity_polling()
+    bot.infinity_polling(none_stop=True)
