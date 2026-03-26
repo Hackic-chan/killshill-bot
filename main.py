@@ -21,7 +21,7 @@ FAQ_DATA = {
     "x?": "🐦 <b>Follow us on X:</b> https://x.com/killshillAI",
     "instagram?": "📸 <b>Instagram:</b> https://www.instagram.com/killshillai/",
     "linkedin?": "💼 <b>LinkedIn:</b> https://www.linkedin.com/company/killshillai",
-    "social?": "🔗 <b>Official Socials:</b>\n- X: x.com/..\n- IG: instagram.com/..\n- Web: yourlink.com"
+    "social?": "🔗 <b>Official Socials:</b>\n- X: https://x.com/killshillAI\n- IG: https://www.instagram.com/killshillai\n- dashboard: https://killshill.ai/"
 }
 
 # Tracking for Flood Control { user_id: [timestamps] }
