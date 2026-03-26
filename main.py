@@ -196,6 +196,13 @@ app = Flask(__name__)
 def home(): return "KillShill Ultimate is Online!", 200
 
 if __name__ == "__main__":
-    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 3000))), daemon=True).start()
-    log.info("🚀 KillShill Ultimate Live...")
+    # Render provides a PORT environment variable. If it's not there, default to 10000.
+    port = int(os.environ.get("PORT", 10000))
+    
+    # Start the Flask server in a separate thread
+    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=port), daemon=True).start()
+    
+    log.info(f"🚀 KillShill Ultimate Live on port {port}...")
+    
+    # Start the Telegram bot
     bot.infinity_polling(none_stop=True)
