@@ -8,6 +8,7 @@ from telebot import types
 from flask import Flask
 
 # 1. SETUP & LOGGING
+# We use a custom format to see exactly when crashes happen
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
@@ -161,8 +162,15 @@ def home():
     return "🛡️ KillShill Ultimate is Online!", 200
 
 def run_bot():
-    log.info("🚀 Starting Telegram Bot polling...")
-    bot.infinity_polling(none_stop=True)
+    while True:
+        try:
+            log.info("🚀 Starting Telegram Bot polling...")
+            # We add timeouts to prevent the connection from hanging
+            bot.infinity_polling(none_stop=True, timeout=90, long_polling_timeout=90)
+        except Exception as e:
+            log.error(f"⚠️ Bot Exception: {e}")
+            log.warning("🔄 Polling failed. Restarting in 5 seconds...")
+            time.sleep(5)
 
 if __name__ == "__main__":
     # Start the Bot in a background thread
@@ -170,7 +178,12 @@ if __name__ == "__main__":
     bot_thread.daemon = True
     bot_thread.start()
 
-    # Start Flask in the MAIN thread (This is what Render monitors)
+    # Silence Flask logging so we only see Bot errors
+    import logging as flask_logging
+    flask_log = flask_logging.getLogger('werkzeug')
+    flask_log.setLevel(flask_logging.ERROR)
+
+    # Start Flask in the MAIN thread
     port = int(os.environ.get("PORT", 10000))
     log.info(f"🌐 Starting Web Server on port {port}...")
     app.run(host="0.0.0.0", port=port)
